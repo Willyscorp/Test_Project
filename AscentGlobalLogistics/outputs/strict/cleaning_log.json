@@ -1,0 +1,102 @@
+{
+  "initial_rows": 9991,
+  "steps": [
+    {
+      "step": "drop_header_rows",
+      "rows_removed": "1",
+      "rows_remaining": 9990
+    },
+    {
+      "step": "drop_null_rows",
+      "rows_removed": "8",
+      "rows_remaining": 9982
+    },
+    {
+      "step": "standardize_equipment_type",
+      "rows_removed": "25",
+      "rows_remaining": 9957
+    },
+    {
+      "step": "coerce_numeric_columns",
+      "rows_removed": 0,
+      "rows_remaining": 9957
+    },
+    {
+      "step": "remove_invalid_targets",
+      "rows_removed": "23",
+      "rows_remaining": 9934
+    },
+    {
+      "step": "remove_negative_values",
+      "rows_removed": "11",
+      "rows_remaining": 9923
+    },
+    {
+      "step": "remove_invalid_dates",
+      "rows_removed": "8",
+      "rows_remaining": 9915
+    },
+    {
+      "step": "drop_remaining_nulls",
+      "rows_removed": 1346,
+      "rows_remaining": 8569
+    },
+    {
+      "step": "remove_outliers_iqr",
+      "rows_removed": "2541",
+      "rows_remaining": 6028
+    }
+  ],
+  "outlier_details": {
+    "weight_lbs": {
+      "Q1": 513.7,
+      "Q3": 2234.6,
+      "IQR": 1720.9,
+      "lower_bound": -2067.65,
+      "upper_bound": 4815.95,
+      "removed": "626"
+    },
+    "cubic_feet": {
+      "Q1": 3.7,
+      "Q3": 15.1,
+      "IQR": 11.4,
+      "lower_bound": -13.4,
+      "upper_bound": 32.2,
+      "removed": "382"
+    },
+    "lead_time_hours": {
+      "Q1": 6.5,
+      "Q3": 23.5,
+      "IQR": 17.0,
+      "lower_bound": -19.0,
+      "upper_bound": 49.0,
+      "removed": "864"
+    },
+    "num_carrier_bids": {
+      "Q1": 2.0,
+      "Q3": 6.0,
+      "IQR": 4.0,
+      "lower_bound": -4.0,
+      "upper_bound": 12.0,
+      "removed": "64"
+    },
+    "lane_volume": {
+      "Q1": 74.0,
+      "Q3": 198.0,
+      "IQR": 124.0,
+      "lower_bound": -112.0,
+      "upper_bound": 384.0,
+      "removed": "180"
+    },
+    "winning_bid_price": {
+      "Q1": 563.28,
+      "Q3": 1731.63,
+      "IQR": 1168.35,
+      "lower_bound": -1189.25,
+      "upper_bound": 3484.16,
+      "removed": "425"
+    }
+  },
+  "final_rows": 6028,
+  "rows_removed_total": 3963
+}

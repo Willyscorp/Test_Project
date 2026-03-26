@@ -126,6 +126,57 @@ def impute_missing(df, numeric_columns, strategy="median"):
     return df, impute_log
 
 
+def remove_negative_values(df, columns):
+    """Remove rows with negative values in physical columns (weight, volume, bids)."""
+    total_removed = 0
+    for col in columns:
+        if col in df.columns:
+            mask = df[col] < 0
+            n = mask.sum()
+            if n > 0:
+                df = df[~mask].copy()
+                total_removed += n
+                logger.info(f"remove_negative_values: {col} — removed {n} rows with negative values")
+    return df, total_removed
+
+
+def remove_invalid_dates(df, min_date="2023-01-01", max_date="2026-12-31"):
+    """Remove rows with dates outside a reasonable range."""
+    df["shipment_date"] = pd.to_datetime(df["shipment_date"], format="mixed", dayfirst=False, errors="coerce")
+    before = len(df)
+    mask = (df["shipment_date"] < min_date) | (df["shipment_date"] > max_date) | df["shipment_date"].isna()
+    n = mask.sum()
+    df = df[~mask].copy()
+    logger.info(f"remove_invalid_dates: removed {n} rows outside [{min_date}, {max_date}]")
+    return df, n
+
+
+def remove_outliers_iqr(df, columns, multiplier=1.5):
+    """Remove rows with outliers using IQR method. Returns df and log of what was removed."""
+    total_removed = 0
+    outlier_log = {}
+    for col in columns:
+        if col not in df.columns:
+            continue
+        q1 = df[col].quantile(0.25)
+        q3 = df[col].quantile(0.75)
+        iqr = q3 - q1
+        lower = q1 - multiplier * iqr
+        upper = q3 + multiplier * iqr
+        mask = (df[col] < lower) | (df[col] > upper)
+        n = mask.sum()
+        if n > 0:
+            df = df[~mask].copy()
+            total_removed += n
+            outlier_log[col] = {
+                "Q1": round(q1, 2), "Q3": round(q3, 2), "IQR": round(iqr, 2),
+                "lower_bound": round(lower, 2), "upper_bound": round(upper, 2),
+                "removed": n,
+            }
+            logger.info(f"remove_outliers_iqr: {col} — removed {n} rows outside [{lower:.2f}, {upper:.2f}]")
+    return df, total_removed, outlier_log
+
+
 def run_cleaning_pipeline(df, config):
     """
     Orchestrator: runs all cleaning steps in order.
@@ -165,4 +216,67 @@ def run_cleaning_pipeline(df, config):
     log["rows_removed_total"] = log["initial_rows"] - log["final_rows"]
 
     logger.info(f"Cleaning complete: {log['initial_rows']} -> {log['final_rows']} rows ({log['rows_removed_total']} removed)")
+    return df, log
+
+
+def run_strict_cleaning_pipeline(df, config):
+    """
+    Strict orchestrator: removes outliers and all garbage data instead of capping.
+    Returns cleaned DataFrame and a detailed log dict.
+    """
+    log = {"initial_rows": len(df), "steps": []}
+
+    def record(name, n_removed):
+        log["steps"].append({"step": name, "rows_removed": n_removed, "rows_remaining": len(df)})
+
+    # Step 1: Drop header rows
+    df, n = drop_header_rows(df)
+    record("drop_header_rows", n)
+
+    # Step 2: Drop fully null rows
+    df, n = drop_null_rows(df)
+    record("drop_null_rows", n)
+
+    # Step 3: Standardize equipment type
+    df, n = standardize_equipment_type(df, config["equipment_mapping"], config["equipment_drop_values"])
+    record("standardize_equipment_type", n)
+
+    # Step 4: Coerce numeric columns
+    df = coerce_numeric_columns(df, config["numeric_columns"])
+    record("coerce_numeric_columns", 0)
+
+    # Step 5: Remove invalid targets
+    df, n = remove_invalid_targets(df)
+    record("remove_invalid_targets", n)
+
+    # Step 6: Remove negative values in physical columns
+    negative_cols = ["weight_lbs", "cubic_feet", "lead_time_hours", "num_carrier_bids"]
+    df, n = remove_negative_values(df, negative_cols)
+    record("remove_negative_values", n)
+
+    # Step 7: Parse and validate dates
+    df, n = remove_invalid_dates(df,
+                                  min_date=config.get("min_date", "2023-01-01"),
+                                  max_date=config.get("max_date", "2026-12-31"))
+    record("remove_invalid_dates", n)
+
+    # Step 8: Drop rows with NaN in any numeric column (no imputation — clean data only)
+    before = len(df)
+    numeric_cols = config["numeric_columns"] + ["winning_bid_price"]
+    df = df.dropna(subset=numeric_cols).copy()
+    n_dropped_na = before - len(df)
+    record("drop_remaining_nulls", n_dropped_na)
+    logger.info(f"drop_remaining_nulls: removed {n_dropped_na} rows with NaN in numeric columns")
+
+    # Step 9: Remove outliers using IQR method
+    iqr_cols = config.get("iqr_columns", config["numeric_columns"] + ["winning_bid_price"])
+    iqr_multiplier = config.get("iqr_multiplier", 1.5)
+    df, n_outliers, outlier_log = remove_outliers_iqr(df, iqr_cols, iqr_multiplier)
+    log["outlier_details"] = outlier_log
+    record("remove_outliers_iqr", n_outliers)
+
+    log["final_rows"] = len(df)
+    log["rows_removed_total"] = log["initial_rows"] - log["final_rows"]
+
+    logger.info(f"Strict cleaning complete: {log['initial_rows']} -> {log['final_rows']} rows ({log['rows_removed_total']} removed)")
     return df, log
