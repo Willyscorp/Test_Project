@@ -1,0 +1,14 @@
+[
+  {
+    "model": "Linear Regression",
+    "MAE": 831.49,
+    "RMSE": 2457.21,
+    "R2": -0.3609
+  },
+  {
+    "model": "Random Forest",
+    "MAE": 662.19,
+    "RMSE": 1373.84,
+    "R2": 0.5746
+  }
+]
